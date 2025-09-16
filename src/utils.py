@@ -1,8 +1,8 @@
 import re
 from datetime import datetime
-from dateutil import parser as dateparser
 from typing import Optional
 
+from dateutil import parser as dateparser
 
 AMOUNT_RE = re.compile(r"([+-]?)\s*(\d{1,3}(?:[\.,]\d{3})*|\d+)([\.,](\d{2}))?")
 
@@ -40,4 +40,3 @@ def parse_amount(text: str) -> Optional[float]:
 
 def safe_lower(s: str) -> str:
     return (s or "").lower()
-

@@ -1,21 +1,24 @@
 import json
-import os
-from typing import Dict, Any
+from typing import Any, Dict
 
 import requests
 
+from . import config
 
-def extract_with_llm(text: str, model: str = "mistral") -> Dict[str, Any]:
+
+def extract_with_llm(
+    text: str, model: str = config.DEFAULT_LLM_MODEL
+) -> Dict[str, Any]:
     """
     Call a local Ollama server to extract structured invoice fields from text.
     Minimal prompt; tolerant to server absence.
     """
-    base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-    url = f"{base_url.rstrip('/')}/api/generate"
+    url = f"{config.OLLAMA_BASE_URL.rstrip('/')}/api/generate"
 
     system = (
         "Tu es un extracteur de champs de facture. "
-        "Retourne un JSON compact avec les clés: invoice_number, invoice_date (YYYY-MM-DD), total_amount (float), currency (ISO)."
+        "Retourne un JSON compact avec les clés: invoice_number, "
+        "invoice_date (YYYY-MM-DD), total_amount (float), currency (ISO)."
     )
     prompt = (
         f"{system}\n\nTexte facture:\n{text}\n\n"
@@ -48,4 +51,3 @@ def extract_with_llm(text: str, model: str = "mistral") -> Dict[str, Any]:
         return parsed
     except Exception:
         return {}
-

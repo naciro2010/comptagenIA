@@ -1,0 +1,42 @@
+/* Simple, clean visual polish for Streamlit */
+:root {
+  --accent: #3B82F6;
+  --bg-soft: #f7f9fc;
+  --text-dark: #0f172a;
+}
+
+.hero {
+  padding: 2.2rem 1.4rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(16,185,129,0.10));
+  border: 1px solid rgba(59,130,246,0.15);
+}
+.hero h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 2.1rem;
+}
+.hero p {
+  margin: 0;
+  color: #334155;
+}
+
+.step {
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+.step + .step { margin-top: 0.6rem; }
+
+.pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1px solid #e5e7eb;
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.muted { color: #64748b; }
+

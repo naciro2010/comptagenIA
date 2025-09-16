@@ -1,20 +1,22 @@
-from typing import List, Dict, Any
 import xml.etree.ElementTree as ET
+from typing import Any, Dict, List
 
 
 def invoices_to_xml_string(invoices: List[Dict[str, Any]]) -> str:
-    root = ET.Element('invoices')
+    root = ET.Element("invoices")
     for inv in invoices:
-        e = ET.SubElement(root, 'invoice')
-        ET.SubElement(e, 'filename').text = str(inv.get('filename') or '')
-        ET.SubElement(e, 'invoice_number').text = str(inv.get('invoice_number') or '')
-        ET.SubElement(e, 'invoice_date').text = str(inv.get('invoice_date') or '')
-        ET.SubElement(e, 'total_amount').text = '' if inv.get('total_amount') is None else f"{inv.get('total_amount'):.2f}"
-        ET.SubElement(e, 'currency').text = str(inv.get('currency') or '')
+        e = ET.SubElement(root, "invoice")
+        ET.SubElement(e, "filename").text = str(inv.get("filename") or "")
+        ET.SubElement(e, "invoice_number").text = str(inv.get("invoice_number") or "")
+        ET.SubElement(e, "invoice_date").text = str(inv.get("invoice_date") or "")
+        ET.SubElement(e, "total_amount").text = (
+            "" if inv.get("total_amount") is None else f"{inv.get('total_amount'):.2f}"
+        )
+        ET.SubElement(e, "currency").text = str(inv.get("currency") or "")
 
     # pretty print
     _indent(root)
-    return ET.tostring(root, encoding='unicode')
+    return ET.tostring(root, encoding="unicode")
 
 
 def _indent(elem, level: int = 0):
@@ -28,4 +30,3 @@ def _indent(elem, level: int = 0):
             child.tail = i
     if level and (not elem.tail or not elem.tail.strip()):
         elem.tail = i
-
