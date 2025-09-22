@@ -108,3 +108,34 @@ Vous avez mentionné « xql ». J’ai implémenté un export **XML** (standard)
 - Export XLSX additionnel
 - Sauvegarde/chargement de sessions
 # comptagenIA
+
+## Module Spring Boot Kotlin
+
+Un service REST Kotlin/Spring Boot (`spring-app/`) reprend les briques principales (extraction factures, lecture relevés, matching et export XML).
+
+### Lancer le service
+- Prérequis: JDK 21+
+- `cd spring-app`
+- `JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew bootRun`
+
+### API principale
+`POST /api/matching/run` (`multipart/form-data`)
+- `invoices`: un ou plusieurs PDF de factures
+- `bankStatement`: relevé bancaire (PDF/CSV/XLS/XLSX)
+- `amountTolerance` (optionnel, défaut `0.02`)
+- `dateToleranceDays` (optionnel, défaut `90`)
+- `useLlm` (optionnel, défaut `false`)
+- `llmModel` (optionnel, défaut `mistral`)
+
+Réponse JSON: factures extraites, résultats de matching, export XML inline.
+
+### Front de test rapide
+Une page statique est disponible sur `http://localhost:8080/` (servie depuis `spring-app/src/main/resources/static/index.html`). Elle permet d'uploader les fichiers, ajuster les paramètres et inspecter les résultats sans outil externe.
+
+### Configuration Ollama
+- Variables dans `application.properties` (`ollama.base-url`, `ollama.model`, `ollama.enabled`).
+- Par défaut, le service tente d'appeler Ollama en local mais ignore les erreurs de connexion pour rester fonctionnel.
+
+### Tests
+`JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew test`
+
