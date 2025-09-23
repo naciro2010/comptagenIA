@@ -143,6 +143,7 @@ class OllamaClient(
         val url = "${baseUrl.trimEnd('/')}/api/generate"
 
         for (model in modelsToTry) {
+            logger.info("Ollama appel modele='{}' prompt_lg={}", model, prompt.length)
             val payload = mapOf(
                 "model" to model,
                 "prompt" to prompt,
@@ -158,6 +159,7 @@ class OllamaClient(
                     if (model != modelOverride && modelOverride != null) {
                         logger.info("Fallback sur le modèle '{}' faute de disponibilité de '{}'.", model, modelOverride)
                     }
+                    logger.info("Ollama réponse OK (modele='{}', taille_json={})", model, jsonText.length)
                     return jsonText
                 }
             } catch (ex: HttpClientErrorException.NotFound) {

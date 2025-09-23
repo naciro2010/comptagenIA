@@ -12,7 +12,10 @@ data class InvoiceData(
     val invoiceDate: LocalDate?,
     val totalAmount: BigDecimal?,
     val currency: String?,
-    val rawText: String
+    val rawText: String,
+    val supplierName: String? = null,
+    val customerName: String? = null,
+    val headerSnippet: String? = null
 )
 
 /**

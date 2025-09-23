@@ -11,7 +11,11 @@ data class InvoiceSummary(
     val invoiceNumber: String?,
     val invoiceDate: LocalDate?,
     val totalAmount: BigDecimal?,
-    val currency: String?
+    val currency: String?,
+    val supplierName: String?,
+    val customerName: String?,
+    val headerSnippet: String?,
+    val matched: Boolean
 )
 
 data class BankTransactionSummary(

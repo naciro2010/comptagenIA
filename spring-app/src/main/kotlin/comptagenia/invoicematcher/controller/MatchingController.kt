@@ -79,6 +79,11 @@ class MatchingController(
         val matches = matchingService.match(extractedInvoices, transactions, amountTolerance, dateToleranceDays)
         logger.info("Matching terminé: {} transaction(s) relevé, {} ligne(s) de sortie", transactions.size, matches.size)
 
+        val matchedInvoiceKeys = matches
+            .filter { it.matched }
+            .map { invoiceKey(it.filename, it.invoiceNumber, it.totalAmount) }
+            .toSet()
+
         val matchedKeys = matches
             .filter { it.matched && it.bankDate != null && it.bankAmount != null && !it.bankDescription.isNullOrBlank() }
             .map { keyFor(it.bankDate!!, it.bankAmount!!, it.bankDescription!!) }
@@ -100,9 +105,21 @@ class MatchingController(
                 invoiceNumber = it.invoiceNumber,
                 invoiceDate = it.invoiceDate,
                 totalAmount = it.totalAmount,
-                currency = it.currency
+                currency = it.currency,
+                supplierName = it.supplierName,
+                customerName = it.customerName,
+                headerSnippet = it.headerSnippet,
+                matched = matchedInvoiceKeys.contains(invoiceKey(it.filename, it.invoiceNumber, it.totalAmount))
             )
         }
+
+        val unmatchedCount = invoiceSummaries.count { !it.matched }
+        logger.info(
+            "Synthèse factures: total={} matched={} unmatched={}",
+            invoiceSummaries.size,
+            invoiceSummaries.size - unmatchedCount,
+            unmatchedCount
+        )
 
         val response = MatchingResponse(
             invoices = invoiceSummaries,
@@ -118,6 +135,12 @@ class MatchingController(
             transactionSummaries.count { it.matched }
         )
         return response
+    }
+
+    private fun invoiceKey(filename: String, invoiceNumber: String?, totalAmount: BigDecimal?): String {
+        val normalizedNumber = invoiceNumber?.trim()?.lowercase() ?: ""
+        val normalizedAmount = totalAmount?.setScale(2, RoundingMode.HALF_UP)?.toPlainString() ?: ""
+        return "$filename|$normalizedNumber|$normalizedAmount"
     }
 
     private fun keyFor(date: LocalDate, amount: BigDecimal, description: String): String {

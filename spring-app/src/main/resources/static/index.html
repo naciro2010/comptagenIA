@@ -20,6 +20,7 @@
     .alert { margin-top: 1rem; padding: 0.75rem; background: #eef5ff; border: 1px solid #bcd4ff; border-radius: 6px; font-size: 0.9rem; line-height: 1.4; }
     .legend { margin-top: 0.75rem; font-size: 0.85rem; color: #555; }
     .matched-row { background: #e6ffed; }
+    .unmatched-row { background: #fff3f3; }
   </style>
 </head>
 <body>
@@ -139,7 +140,12 @@
 
     function renderResults(data) {
         const invoices = document.createElement('div');
-        invoices.innerHTML = '<h3>Factures extraites</h3>' + buildTable(data.invoices || []);
+        invoices.innerHTML = '<h3>Factures extraites</h3>' +
+          buildTable(
+            data.invoices || [],
+            row => row.matched ? 'matched-row' : 'unmatched-row',
+            ['matched']
+          );
 
         const transactions = document.createElement('div');
         transactions.innerHTML = '<h3>Transactions du relevé</h3>' +
@@ -162,6 +168,13 @@
         resultsContainer.appendChild(invoices);
         resultsContainer.appendChild(transactions);
         resultsContainer.appendChild(matches);
+        const unmatched = (data.invoices || []).filter(row => !row.matched);
+        if (unmatched.length) {
+          const unmatchedDiv = document.createElement('div');
+          unmatchedDiv.innerHTML = '<h3>Factures sans correspondance</h3>' +
+            buildTable(unmatched, () => 'unmatched-row', ['matched']);
+          resultsContainer.appendChild(unmatchedDiv);
+        }
         resultsContainer.appendChild(xml);
     }
 
@@ -185,8 +198,10 @@
       const matchedCount = matches.filter(row => row.matched).length;
       const transactions = (data.transactions || []);
       const matchedTransactions = transactions.filter(row => row.matched).length;
-      statusEl.textContent = `Analyse terminée : ${invoiceCount} facture(s), ${matchedCount} appariement(s), ${transactions.length} transaction(s) dont ${matchedTransactions} liées.`;
+      const unmatchedInvoices = (data.invoices || []).filter(row => !row.matched).length;
+      statusEl.textContent = `Analyse terminée : ${invoiceCount} facture(s), ${matchedCount} appariement(s), ${transactions.length} transaction(s) dont ${matchedTransactions} liées, ${unmatchedInvoices} facture(s) sans correspondance.`;
     }
+
 
     function escapeHtml(value) {
       if (value === null || value === undefined) return '';

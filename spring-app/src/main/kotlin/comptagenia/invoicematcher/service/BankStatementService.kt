@@ -170,6 +170,7 @@ class BankStatementService(
         var result = transactions
 
         if (transactions.isEmpty() && useLlm) {
+            logger.info("Relevé {} : tentative extraction IA (transactions heuristiques=0)", file.filename)
             val llmTransactions = ollamaClient?.extractBankTransactions(text, llmModel) ?: emptyList()
             if (llmTransactions.isNotEmpty()) {
                 logger.info("Relevé {} (PDF) : {} transactions extraites via LLM", file.filename, llmTransactions.size)
@@ -220,6 +221,7 @@ class BankStatementService(
         return try {
             detectColumns(headers)
         } catch (ex: IllegalArgumentException) {
+            logger.warn("Colonnes non reconnues via heuristique: {} ({} entêtes)", ex.message, headers)
             if (useLlm) {
                 val inference = ollamaClient?.inferBankColumns(headers, sampleRows, llmModel)
                 if (inference != null) {
@@ -247,6 +249,7 @@ class BankStatementService(
                     logger.warn("LLM n'a pas pu inférer les colonnes")
                 }
             }
+            logger.error("Echec de détection des colonnes, relance l'exception")
             throw ex
         }
     }

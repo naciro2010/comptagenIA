@@ -14,7 +14,7 @@ Tech choisi: Python + Streamlit (simple, local, facile à déployer et à faire 
 
 - Python 3.10+
 - pip
-- (Optionnel) [Ollama](https://ollama.com) en local pour activer le mode LLM (`ollama run mistral` par exemple)
+- (Optionnel) [Ollama](https://ollama.com) en local pour activer le mode LLM (`ollama run gpt-oss:20b` par exemple)
 
 ## Installation sur laptop (macOS/Windows/Linux)
 
@@ -80,7 +80,7 @@ Notes Cloud:
 1. Chargez une ou plusieurs factures PDF.
 2. Chargez le relevé bancaire (PDF/CSV/XLSX). Le mapping de colonnes est détecté automatiquement (date, description, montant).
 3. Cliquez sur « Extraire factures » puis « Charger relevé ».
-4. Si souhaité, activez « Utiliser LLM local (Ollama) » dans la barre latérale (serveur Ollama nécessaire, modèle par défaut: `mistral`).
+4. Si souhaité, activez « Utiliser LLM local (Ollama) » dans la barre latérale (serveur Ollama nécessaire, modèle par défaut: `gpt-oss:20b`).
 5. Téléchargez l’export XML des factures et le CSV des résultats de matching.
 
 ### Tour de l’interface
@@ -125,7 +125,7 @@ Un service REST Kotlin/Spring Boot (`spring-app/`) reprend les briques principal
 - `amountTolerance` (optionnel, défaut `0.02`)
 - `dateToleranceDays` (optionnel, défaut `90`)
 - `useLlm` (optionnel, défaut `false`). Lorsqu'il est activé, Ollama est utilisé à la fois pour enrichir les factures **et** pour détecter automatiquement les colonnes du relevé / reconstruire les transactions si le format est atypique.
-- `llmModel` (optionnel, défaut `mistral`)
+- `llmModel` (optionnel, défaut `gpt-oss:20b`)
 
 Réponse JSON: factures extraites, résultats de matching, export XML inline.
 
@@ -134,6 +134,8 @@ Une page statique est disponible sur `http://localhost:8080/` (servie depuis `sp
 
 La section résultats affiche désormais les transactions du relevé (issues des heuristiques ou de l'IA). Les lignes surlignées en vert correspondent aux opérations appariées à une facture.
 
+- Les factures multiples dans un même PDF sont détectées automatiquement (`fichier.pdf#1`, `fichier.pdf#2`, ...). Chaque fiche affiche les métadonnées principales (fournisseur, client, en-tête) et l'état du matching (vert = trouvé, rouge = manquant).
+
 **Note upload**: la limite côté serveur est fixée à ~120 Mo par fichier (130 Mo par requête). Au‑delà, l'API renvoie un message d'erreur lisible dans l'interface.
 
 En cas de fichier mal reconnu (par ex. colonnes manquantes), l'API renvoie un 400 avec le détail (`Impossible de détecter la colonne ...`, `Aucune transaction détectée ...`) et la page web reflète ce message.
@@ -141,7 +143,7 @@ En cas de fichier mal reconnu (par ex. colonnes manquantes), l'API renvoie un 40
 ### Configuration Ollama
 - Variables dans `application.properties` (`ollama.base-url`, `ollama.model`, `ollama.enabled`).
 - Par défaut, le service tente d'appeler Ollama en local mais ignore les erreurs de connexion pour rester fonctionnel.
-- Si vous saisissez un modèle non installé (ex. `gpt-oss:20b`), le service retombe automatiquement sur le modèle par défaut (`mistral`) et loggue un avertissement. Pour utiliser un autre modèle, téléchargez-le au préalable (`ollama pull <modele>`).
+- Si vous saisissez un modèle non installé (ex. `mistral`), le service retombe automatiquement sur le modèle par défaut (`gpt-oss:20b`) et loggue un avertissement. Pour utiliser un autre modèle, téléchargez-le au préalable (`ollama pull <modele>`).
 
 ### Tests
 `JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew test`

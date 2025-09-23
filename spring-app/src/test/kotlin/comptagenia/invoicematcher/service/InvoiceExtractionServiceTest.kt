@@ -24,5 +24,6 @@ class InvoiceExtractionServiceTest {
         assertEquals(2024, invoice.invoiceDate?.year)
         assertEquals("EUR", invoice.currency)
         assertNotNull(invoice.totalAmount)
+        assertNotNull(invoice.headerSnippet)
     }
 }
