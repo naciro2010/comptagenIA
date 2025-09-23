@@ -24,8 +24,8 @@ class OllamaClient(
 ) {
 
     private val restTemplate: RestTemplate = builder
-        .setConnectTimeout(Duration.ofSeconds(5))
-        .setReadTimeout(Duration.ofSeconds(60))
+        .setConnectTimeout(Duration.ofSeconds(5L))
+        .setReadTimeout(Duration.ofSeconds(60L))
         .build()
 
     fun isEnabled(): Boolean = enabled

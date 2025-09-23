@@ -47,12 +47,13 @@ class BankStatementService(
 
     private fun parseCsvWithSeparator(file: BankStatementFile, separator: Char): List<BankTransaction>? {
         val reader = BufferedReader(InputStreamReader(ByteArrayInputStream(file.bytes)))
-        val format = CSVFormat.DEFAULT
-            .withDelimiter(separator)
-            .withIgnoreEmptyLines()
-            .withTrim()
-            .withQuoteMode(QuoteMode.MINIMAL)
-            .withFirstRecordAsHeader()
+        val format = CSVFormat.Builder.create()
+            .setDelimiter(separator)
+            .setIgnoreEmptyLines(true)
+            .setTrim(true)
+            .setQuoteMode(QuoteMode.MINIMAL)
+            .setHeader()
+            .build()
         val parser = CSVParser(reader, format)
         if (parser.headerNames.isEmpty()) return null
         val columnMapping = detectColumns(parser.headerNames)
@@ -139,8 +140,9 @@ class BankStatementService(
             var bestHeader: String? = null
             for ((idx, header) in normalized.withIndex()) {
                 for (candidate in candidates) {
-                    val score = StringUtils.getJaroWinklerDistance(header, candidate)
-                    if (score > bestScore) {
+                    val score = org.apache.commons.text.similarity.JaroWinklerSimilarity().apply { }.
+                        apply(header, candidate)
+                    if (score != null && score > bestScore) {
                         bestScore = score
                         bestHeader = headers[idx]
                     }
