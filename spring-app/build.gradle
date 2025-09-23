@@ -45,3 +45,9 @@ kotlin {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+}
