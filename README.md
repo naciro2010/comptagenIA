@@ -124,7 +124,7 @@ Un service REST Kotlin/Spring Boot (`spring-app/`) reprend les briques principal
 - `bankStatement`: relevé bancaire (PDF/CSV/XLS/XLSX)
 - `amountTolerance` (optionnel, défaut `0.02`)
 - `dateToleranceDays` (optionnel, défaut `90`)
-- `useLlm` (optionnel, défaut `false`)
+- `useLlm` (optionnel, défaut `false`). Lorsqu'il est activé, Ollama est utilisé à la fois pour enrichir les factures **et** pour détecter automatiquement les colonnes du relevé / reconstruire les transactions si le format est atypique.
 - `llmModel` (optionnel, défaut `mistral`)
 
 Réponse JSON: factures extraites, résultats de matching, export XML inline.
@@ -132,10 +132,16 @@ Réponse JSON: factures extraites, résultats de matching, export XML inline.
 ### Front de test rapide
 Une page statique est disponible sur `http://localhost:8080/` (servie depuis `spring-app/src/main/resources/static/index.html`). Elle permet d'uploader les fichiers, ajuster les paramètres et inspecter les résultats sans outil externe.
 
+La section résultats affiche désormais les transactions du relevé (issues des heuristiques ou de l'IA). Les lignes surlignées en vert correspondent aux opérations appariées à une facture.
+
+**Note upload**: la limite côté serveur est fixée à ~120 Mo par fichier (130 Mo par requête). Au‑delà, l'API renvoie un message d'erreur lisible dans l'interface.
+
+En cas de fichier mal reconnu (par ex. colonnes manquantes), l'API renvoie un 400 avec le détail (`Impossible de détecter la colonne ...`, `Aucune transaction détectée ...`) et la page web reflète ce message.
+
 ### Configuration Ollama
 - Variables dans `application.properties` (`ollama.base-url`, `ollama.model`, `ollama.enabled`).
 - Par défaut, le service tente d'appeler Ollama en local mais ignore les erreurs de connexion pour rester fonctionnel.
+- Si vous saisissez un modèle non installé (ex. `gpt-oss:20b`), le service retombe automatiquement sur le modèle par défaut (`mistral`) et loggue un avertissement. Pour utiliser un autre modèle, téléchargez-le au préalable (`ollama pull <modele>`).
 
 ### Tests
 `JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew test`
-

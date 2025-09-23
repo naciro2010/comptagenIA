@@ -14,8 +14,16 @@ data class InvoiceSummary(
     val currency: String?
 )
 
+data class BankTransactionSummary(
+    val date: LocalDate,
+    val description: String,
+    val amount: BigDecimal,
+    val matched: Boolean
+)
+
 data class MatchingResponse(
     val invoices: List<InvoiceSummary>,
     val matches: List<InvoiceMatchResult>,
+    val transactions: List<BankTransactionSummary>,
     val xmlExport: String
 )

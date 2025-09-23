@@ -17,12 +17,18 @@
     th, td { padding: 0.5rem; border: 1px solid #ddd; font-size: 0.9rem; }
     th { background: #f0f0f0; text-align: left; }
     .status { margin-top: 1rem; font-style: italic; }
+    .alert { margin-top: 1rem; padding: 0.75rem; background: #eef5ff; border: 1px solid #bcd4ff; border-radius: 6px; font-size: 0.9rem; line-height: 1.4; }
+    .legend { margin-top: 0.75rem; font-size: 0.85rem; color: #555; }
+    .matched-row { background: #e6ffed; }
   </style>
 </head>
 <body>
   <div class="panel">
     <h1>Invoice Matcher (Kotlin)</h1>
     <p>Déposez vos factures (PDF) et un relevé bancaire, puis lancez l'analyse. Les fichiers sont envoyés à l'API <code>/api/matching/run</code>.</p>
+    <div class="alert">
+      <strong>Formats attendus&nbsp;:</strong> factures PDF ; relevé en PDF, CSV (séparateur ,, ;, tabulation ou |) ou Excel (XLS/XLSX). Le relevé doit contenir des colonnes date, description et montant. Avec l'option «&nbsp;Utiliser Ollama&nbsp;», l'IA tente d'identifier automatiquement les colonnes même si les entêtes sont exotiques (multi-langues, arabe, etc.). Un message d'erreur détaillé s'affichera si rien n'est détecté.
+    </div>
     <form id="matching-form">
       <label>Factures PDF</label>
       <input type="file" id="invoices" name="invoices" accept="application/pdf" multiple required />
@@ -98,13 +104,31 @@
         });
 
         if (!response.ok) {
-          const message = await response.text();
-          throw new Error(message || 'Erreur lors de l\'appel API');
+          let message = 'Erreur lors de l\'appel API';
+          let details = '';
+          try {
+            const text = await response.text();
+            if (text) {
+              message = text;
+              try {
+                const parsed = JSON.parse(text);
+                message = parsed.error || parsed.message || message;
+                if (parsed.details && parsed.details !== message) {
+                  details = parsed.details;
+                }
+              } catch (_) {
+                // texte brut
+              }
+            }
+          } catch (_) {
+            // ignore
+          }
+          throw new Error(details ? `${message} (${details})` : message);
         }
 
         const data = await response.json();
+        updateStatus(data);
         renderResults(data);
-        statusEl.textContent = 'Analyse terminée.';
       } catch (error) {
         console.error(error);
         statusEl.textContent = `Erreur: ${error.message}`;
@@ -114,34 +138,54 @@
     });
 
     function renderResults(data) {
-      const invoices = document.createElement('div');
-      invoices.innerHTML = '<h3>Factures extraites</h3>' + buildTable(data.invoices || []);
+        const invoices = document.createElement('div');
+        invoices.innerHTML = '<h3>Factures extraites</h3>' + buildTable(data.invoices || []);
 
-      const matches = document.createElement('div');
-      matches.innerHTML = '<h3>Matching</h3>' + buildTable(data.matches || []);
+        const transactions = document.createElement('div');
+        transactions.innerHTML = '<h3>Transactions du relevé</h3>' +
+          buildTable(data.transactions || [], row => row.matched ? 'matched-row' : '', ['matched']);
 
-      const xml = document.createElement('div');
-      xml.innerHTML = '<h3>Export XML</h3>';
-      const pre = document.createElement('pre');
-      pre.textContent = data.xmlExport || '';
-      xml.appendChild(pre);
+        const legend = document.createElement('p');
+        legend.className = 'legend';
+        legend.textContent = 'Les lignes en vert correspondent aux transactions associées à une facture.';
+        transactions.appendChild(legend);
+      
+        const matches = document.createElement('div');
+        matches.innerHTML = '<h3>Matching</h3>' + buildTable(data.matches || []);
+      
+        const xml = document.createElement('div');
+        xml.innerHTML = '<h3>Export XML</h3>';
+        const pre = document.createElement('pre');
+        pre.textContent = data.xmlExport || '';
+        xml.appendChild(pre);
 
-      resultsContainer.appendChild(invoices);
-      resultsContainer.appendChild(matches);
-      resultsContainer.appendChild(xml);
+        resultsContainer.appendChild(invoices);
+        resultsContainer.appendChild(transactions);
+        resultsContainer.appendChild(matches);
+        resultsContainer.appendChild(xml);
     }
 
-    function buildTable(rows) {
+    function buildTable(rows, getRowClass, hiddenKeys = []) {
       if (!rows || !rows.length) {
         return '<p>Aucune donnée.</p>';
       }
-      const headers = Object.keys(rows[0]);
+      const headers = Object.keys(rows[0]).filter(h => !hiddenKeys.includes(h));
       const headerHtml = headers.map(h => `<th>${h}</th>`).join('');
-      const bodyHtml = rows.map(row => {
+      const bodyHtml = rows.map((row, index) => {
+        const rowClass = getRowClass ? getRowClass(row, index) : '';
         const cells = headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('');
-        return `<tr>${cells}</tr>`;
+        return `<tr class="${rowClass}">${cells}</tr>`;
       }).join('');
       return `<table><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+    }
+
+    function updateStatus(data) {
+      const invoiceCount = (data.invoices || []).length;
+      const matches = (data.matches || []);
+      const matchedCount = matches.filter(row => row.matched).length;
+      const transactions = (data.transactions || []);
+      const matchedTransactions = transactions.filter(row => row.matched).length;
+      statusEl.textContent = `Analyse terminée : ${invoiceCount} facture(s), ${matchedCount} appariement(s), ${transactions.length} transaction(s) dont ${matchedTransactions} liées.`;
     }
 
     function escapeHtml(value) {
