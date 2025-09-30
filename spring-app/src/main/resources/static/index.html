@@ -2,216 +2,162 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Invoice Matcher Demo</title>
+  <title>Extraction Factures & Relevés (Kotlin)</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background: #f5f5f5; color: #333; }
     h1 { margin-bottom: 0.5rem; }
     .panel { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
     label { display: block; margin-top: 1rem; font-weight: 600; }
-    input[type="file"], input[type="number"], input[type="text"] { width: 100%; margin-top: 0.4rem; }
+    input[type="file"] { margin-top: 0.5rem; }
     button { margin-top: 1.5rem; padding: 0.75rem 1.2rem; background: #0066cc; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
     button:disabled { background: #9aa5b1; cursor: not-allowed; }
-    .results { display: grid; gap: 1rem; }
-    pre { background: #1e1e1e; color: #dcdcdc; padding: 1rem; border-radius: 6px; overflow: auto; }
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     th, td { padding: 0.5rem; border: 1px solid #ddd; font-size: 0.9rem; }
     th { background: #f0f0f0; text-align: left; }
+    pre { background: #1e1e1e; color: #dcdcdc; padding: 1rem; border-radius: 6px; overflow: auto; }
     .status { margin-top: 1rem; font-style: italic; }
-    .alert { margin-top: 1rem; padding: 0.75rem; background: #eef5ff; border: 1px solid #bcd4ff; border-radius: 6px; font-size: 0.9rem; line-height: 1.4; }
-    .legend { margin-top: 0.75rem; font-size: 0.85rem; color: #555; }
-    .matched-row { background: #e6ffed; }
-    .unmatched-row { background: #fff3f3; }
+    .grid { display: grid; gap: 1.5rem; }
   </style>
 </head>
 <body>
   <div class="panel">
-    <h1>Invoice Matcher (Kotlin)</h1>
-    <p>Déposez vos factures (PDF) et un relevé bancaire, puis lancez l'analyse. Les fichiers sont envoyés à l'API <code>/api/matching/run</code>.</p>
-    <div class="alert">
-      <strong>Formats attendus&nbsp;:</strong> factures PDF ; relevé en PDF, CSV (séparateur ,, ;, tabulation ou |) ou Excel (XLS/XLSX). Le relevé doit contenir des colonnes date, description et montant. Avec l'option «&nbsp;Utiliser Ollama&nbsp;», l'IA tente d'identifier automatiquement les colonnes même si les entêtes sont exotiques (multi-langues, arabe, etc.). Un message d'erreur détaillé s'affichera si rien n'est détecté.
-    </div>
-    <form id="matching-form">
-      <label>Factures PDF</label>
-      <input type="file" id="invoices" name="invoices" accept="application/pdf" multiple required />
-
-      <label>Relevé bancaire (PDF, CSV, XLS, XLSX)</label>
-      <input type="file" id="bank" name="bankStatement" accept="application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required />
-
-      <div style="display:flex; gap:1rem; flex-wrap: wrap;">
-        <label style="flex:1; min-width:200px;">Tolérance montant (EUR)
-          <input type="number" id="amountTolerance" name="amountTolerance" value="0.02" min="0" step="0.01" />
-        </label>
-        <label style="flex:1; min-width:200px;">Tolérance jours
-          <input type="number" id="dateToleranceDays" name="dateToleranceDays" value="90" min="0" max="365" />
-        </label>
-      </div>
-
-      <label style="display:flex; align-items:center; gap:0.5rem;">
-        <input type="checkbox" id="useLlm" /> Utiliser Ollama (si disponible)
-      </label>
-
-      <label>Modèle Ollama</label>
-      <input type="text" id="llmModel" name="llmModel" value="mistral" />
-
-      <button type="submit" id="submit-btn">Lancer l'analyse</button>
-      <div class="status" id="status"></div>
-    </form>
+    <h1>Pipeline OCR Kotlin</h1>
+    <p>Cette page appelle l'API Spring Boot pour extraire les données clés des factures et analyser un relevé bancaire. Les PDF natifs sont lus via PDFBox, les scans passent par Tesseract (fra+eng).</p>
   </div>
 
-  <div class="panel">
-    <h2>Résultats</h2>
-    <div class="results" id="results"></div>
+  <div class="grid">
+    <div class="panel">
+      <h2>Extraire des factures</h2>
+      <form id="invoice-form">
+        <label>Factures (PDF ou images)</label>
+        <input type="file" id="invoice-files" accept="application/pdf,image/*" multiple required />
+        <button type="submit" id="invoice-submit">Lancer l'extraction</button>
+        <div class="status" id="invoice-status"></div>
+      </form>
+      <div id="invoice-results"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Analyser un relevé bancaire</h2>
+      <form id="statement-form">
+        <label>Relevé (PDF, image, CSV, XLS, XLSX)</label>
+        <input type="file" id="statement-file" accept="application/pdf,image/*,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
+        <button type="submit" id="statement-submit">Analyser le relevé</button>
+        <div class="status" id="statement-status"></div>
+      </form>
+      <div id="statement-results"></div>
+    </div>
   </div>
 
   <script>
-    const form = document.getElementById('matching-form');
-    const resultsContainer = document.getElementById('results');
-    const statusEl = document.getElementById('status');
-    const submitBtn = document.getElementById('submit-btn');
+    async function callApi(url, formData) {
+      const response = await fetch(url, { method: 'POST', body: formData });
+      if (!response.ok) {
+        let message = `Erreur ${response.status}`;
+        try {
+          const payload = await response.json();
+          message = payload.message || payload.error || message;
+        } catch (_) {
+          const text = await response.text();
+          if (text) message = text;
+        }
+        throw new Error(message);
+      }
+      return response.json();
+    }
 
-    form.addEventListener('submit', async (event) => {
+    function renderInvoiceTable(invoices) {
+      if (!invoices.length) {
+        return '<p>Aucune facture détectée.</p>';
+      }
+      const rows = invoices.map(inv => `
+        <tr>
+          <td>${inv.filename}</td>
+          <td>${inv.invoiceNumber || ''}</td>
+          <td>${inv.invoiceDate || ''}</td>
+          <td>${inv.totalAmount ?? ''}</td>
+          <td>${inv.currency || ''}</td>
+        </tr>`).join('');
+      return `<table>
+        <thead>
+          <tr><th>Fichier</th><th>N° facture</th><th>Date</th><th>Total</th><th>Devise</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+
+    function renderTransactionsTable(result) {
+      if (!result.transactions || !result.transactions.length) {
+        return '<p>Aucune transaction détectée.</p>';
+      }
+      const rows = result.transactions.map(tx => `
+        <tr>
+          <td>${tx.date || ''}</td>
+          <td>${tx.description || ''}</td>
+          <td>${tx.amount ?? ''}</td>
+        </tr>`).join('');
+      return `<div>
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Montant</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${result.rawText ? `<details><summary>Texte complet (OCR)</summary><pre>${result.rawText}</pre></details>` : ''}
+      </div>`;
+    }
+
+    document.getElementById('invoice-form').addEventListener('submit', async (event) => {
       event.preventDefault();
-      resultsContainer.innerHTML = '';
-      statusEl.textContent = 'Analyse en cours...';
-      submitBtn.disabled = true;
+      const input = document.getElementById('invoice-files');
+      const files = Array.from(input.files || []);
+      const status = document.getElementById('invoice-status');
+      const container = document.getElementById('invoice-results');
+      const submit = document.getElementById('invoice-submit');
+      container.innerHTML = '';
+      status.textContent = 'Extraction en cours...';
+      submit.disabled = true;
 
       try {
+        if (!files.length) {
+          throw new Error('Sélectionnez au moins un fichier');
+        }
         const formData = new FormData();
-        const invoiceFiles = document.getElementById('invoices').files;
-        const bankFile = document.getElementById('bank').files[0];
-        const amountTolerance = document.getElementById('amountTolerance').value || '0.02';
-        const dateTolerance = document.getElementById('dateToleranceDays').value || '90';
-        const useLlm = document.getElementById('useLlm').checked;
-        const llmModel = document.getElementById('llmModel').value;
-
-        if (!invoiceFiles.length || !bankFile) {
-          statusEl.textContent = 'Merci de sélectionner les fichiers requis.';
-          submitBtn.disabled = false;
-          return;
-        }
-
-        Array.from(invoiceFiles).forEach(file => formData.append('invoices', file));
-        formData.append('bankStatement', bankFile);
-        formData.append('amountTolerance', amountTolerance);
-        formData.append('dateToleranceDays', dateTolerance);
-        formData.append('useLlm', useLlm);
-        if (llmModel && llmModel.trim() !== '') {
-          formData.append('llmModel', llmModel.trim());
-        }
-
-        const response = await fetch('/api/matching/run', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!response.ok) {
-          let message = 'Erreur lors de l\'appel API';
-          let details = '';
-          try {
-            const text = await response.text();
-            if (text) {
-              message = text;
-              try {
-                const parsed = JSON.parse(text);
-                message = parsed.error || parsed.message || message;
-                if (parsed.details && parsed.details !== message) {
-                  details = parsed.details;
-                }
-              } catch (_) {
-                // texte brut
-              }
-            }
-          } catch (_) {
-            // ignore
-          }
-          throw new Error(details ? `${message} (${details})` : message);
-        }
-
-        const data = await response.json();
-        updateStatus(data);
-        renderResults(data);
+        files.forEach(file => formData.append('files', file));
+        const data = await callApi('/api/documents/invoices/extract', formData);
+        container.innerHTML = renderInvoiceTable(data);
+        status.textContent = `Extraction terminée (${data.length} facture(s)).`;
       } catch (error) {
-        console.error(error);
-        statusEl.textContent = `Erreur: ${error.message}`;
+        status.textContent = `Erreur: ${error.message}`;
       } finally {
-        submitBtn.disabled = false;
+        submit.disabled = false;
       }
     });
 
-    function renderResults(data) {
-        const invoices = document.createElement('div');
-        invoices.innerHTML = '<h3>Factures extraites</h3>' +
-          buildTable(
-            data.invoices || [],
-            row => row.matched ? 'matched-row' : 'unmatched-row',
-            ['matched']
-          );
+    document.getElementById('statement-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const input = document.getElementById('statement-file');
+      const file = input.files[0];
+      const status = document.getElementById('statement-status');
+      const container = document.getElementById('statement-results');
+      const submit = document.getElementById('statement-submit');
+      container.innerHTML = '';
+      status.textContent = 'Analyse en cours...';
+      submit.disabled = true;
 
-        const transactions = document.createElement('div');
-        transactions.innerHTML = '<h3>Transactions du relevé</h3>' +
-          buildTable(data.transactions || [], row => row.matched ? 'matched-row' : '', ['matched']);
-
-        const legend = document.createElement('p');
-        legend.className = 'legend';
-        legend.textContent = 'Les lignes en vert correspondent aux transactions associées à une facture.';
-        transactions.appendChild(legend);
-      
-        const matches = document.createElement('div');
-        matches.innerHTML = '<h3>Matching</h3>' + buildTable(data.matches || []);
-      
-        const xml = document.createElement('div');
-        xml.innerHTML = '<h3>Export XML</h3>';
-        const pre = document.createElement('pre');
-        pre.textContent = data.xmlExport || '';
-        xml.appendChild(pre);
-
-        resultsContainer.appendChild(invoices);
-        resultsContainer.appendChild(transactions);
-        resultsContainer.appendChild(matches);
-        const unmatched = (data.invoices || []).filter(row => !row.matched);
-        if (unmatched.length) {
-          const unmatchedDiv = document.createElement('div');
-          unmatchedDiv.innerHTML = '<h3>Factures sans correspondance</h3>' +
-            buildTable(unmatched, () => 'unmatched-row', ['matched']);
-          resultsContainer.appendChild(unmatchedDiv);
+      try {
+        if (!file) {
+          throw new Error('Sélectionnez un relevé bancaire');
         }
-        resultsContainer.appendChild(xml);
-    }
-
-    function buildTable(rows, getRowClass, hiddenKeys = []) {
-      if (!rows || !rows.length) {
-        return '<p>Aucune donnée.</p>';
+        const formData = new FormData();
+        formData.append('file', file);
+        const data = await callApi('/api/documents/bank-statements/extract', formData);
+        container.innerHTML = renderTransactionsTable(data);
+        status.textContent = `Analyse terminée (${data.transactions.length} transaction(s)).`;
+      } catch (error) {
+        status.textContent = `Erreur: ${error.message}`;
+      } finally {
+        submit.disabled = false;
       }
-      const headers = Object.keys(rows[0]).filter(h => !hiddenKeys.includes(h));
-      const headerHtml = headers.map(h => `<th>${h}</th>`).join('');
-      const bodyHtml = rows.map((row, index) => {
-        const rowClass = getRowClass ? getRowClass(row, index) : '';
-        const cells = headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('');
-        return `<tr class="${rowClass}">${cells}</tr>`;
-      }).join('');
-      return `<table><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
-    }
-
-    function updateStatus(data) {
-      const invoiceCount = (data.invoices || []).length;
-      const matches = (data.matches || []);
-      const matchedCount = matches.filter(row => row.matched).length;
-      const transactions = (data.transactions || []);
-      const matchedTransactions = transactions.filter(row => row.matched).length;
-      const unmatchedInvoices = (data.invoices || []).filter(row => !row.matched).length;
-      statusEl.textContent = `Analyse terminée : ${invoiceCount} facture(s), ${matchedCount} appariement(s), ${transactions.length} transaction(s) dont ${matchedTransactions} liées, ${unmatchedInvoices} facture(s) sans correspondance.`;
-    }
-
-
-    function escapeHtml(value) {
-      if (value === null || value === undefined) return '';
-      return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
+    });
   </script>
 </body>
 </html>
