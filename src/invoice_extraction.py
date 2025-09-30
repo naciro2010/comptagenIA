@@ -1,11 +1,9 @@
-import io
 import re
 from typing import Any, Dict, List, Optional
 
-import pdfplumber
-
 from .llm_extraction import extract_with_llm
 from .utils import parse_amount, parse_date, safe_lower
+from .ocr import extract_text_from_any
 
 INVOICE_NUMBER_PATTERNS = [
     r"facture\s*(?:n[°o]|no|num(?:éro)?)\s*[:#-]?\s*([A-Za-z0-9\-_/]{3,})",
@@ -23,15 +21,6 @@ TOTAL_PATTERNS = [
 ]
 
 CURRENCY_MARKERS = ["eur", "€", "eur.", "euro", "euros"]
-
-
-def extract_text_from_pdf(file_bytes: bytes) -> str:
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        texts = []
-        for page in pdf.pages:
-            txt = page.extract_text(x_tolerance=2, y_tolerance=2) or ""
-            texts.append(txt)
-    return "\n".join(texts)
 
 
 def _find_invoice_number(low_text: str) -> Optional[str]:
@@ -108,7 +97,12 @@ def extract_invoices_from_pdfs(
     results: List[Dict[str, Any]] = []
     for f in files:
         content = f.read()
-        text = extract_text_from_pdf(content)
+        filename = getattr(f, "name", "facture.pdf")
+        text = extract_text_from_any(content, filename)
+        try:
+            f.seek(0)
+        except Exception:
+            pass
 
         parsed = heuristic_parse(text)
         if use_llm:

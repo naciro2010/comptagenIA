@@ -11,12 +11,29 @@ import pdfplumber
 from dateutil import parser as dateparser
 from rapidfuzz import fuzz
 
+from .ocr import SUPPORTED_IMAGE_FORMATS, extract_text_from_any
+
 
 def _read_statement_to_dataframe(file) -> pd.DataFrame:
     """Reads a bank statement file (CSV or Excel) into a DataFrame."""
     name = getattr(file, "name", "releve")
     if name.lower().endswith(".pdf"):
         return _read_bank_pdf_to_dataframe(file)
+    if any(name.lower().endswith(ext) for ext in SUPPORTED_IMAGE_FORMATS):
+        content = file.read()
+        text = extract_text_from_any(content, name)
+        try:
+            file.seek(0)
+        except Exception:
+            pass
+        df = _build_df_from_text_lines(
+            [ln.strip() for ln in text.splitlines() if ln.strip()]
+        )
+        if df is not None:
+            return df
+        raise ValueError(
+            "Impossible de détecter des transactions dans l'image fournie."
+        )
     if name.lower().endswith((".xlsx", ".xls")):
         return pd.read_excel(file)
 
@@ -136,6 +153,32 @@ def _build_df_from_table(table: List[List[str]]) -> Optional[pd.DataFrame]:
     return out
 
 
+def _build_df_from_text_lines(lines: List[str]) -> Optional[pd.DataFrame]:
+    recs: List[Dict[str, Any]] = []
+    date_re = re.compile(r"^(\d{1,2}[\-/]\d{1,2}[\-/]\d{2,4})\s+(.*)")
+    amt_re = re.compile(r"([+-]?\s*\d[\d\s\.,]*)$")
+    from .utils import parse_date as _parse_date, parse_amount as _parse_amount
+
+    for ln in lines:
+        m = date_re.match(ln)
+        if not m:
+            continue
+        d_s, rest = m.groups()
+        amt_m = amt_re.search(rest)
+        if not amt_m:
+            continue
+        amt_s = amt_m.group(1)
+        desc = rest[: amt_m.start(1)].strip()
+        dt = _parse_date(d_s)
+        amt = _parse_amount(amt_s)
+        if dt and amt is not None:
+            recs.append({"date": dt, "description": desc, "amount": amt})
+
+    if recs:
+        return pd.DataFrame(recs)
+    return None
+
+
 def _read_bank_pdf_to_dataframe(file) -> pd.DataFrame:
     """Extracts transactions from a PDF bank statement.
 
@@ -187,8 +230,20 @@ def _read_bank_pdf_to_dataframe(file) -> pd.DataFrame:
                             "description": desc,
                             "amount": amt,
                         })
-                if recs:
-                    frames.append(pd.DataFrame(recs))
+                df_text = _build_df_from_text_lines(lines)
+                if df_text is not None:
+                    frames.append(df_text)
+
+    if not frames:
+        fallback_text = extract_text_from_any(
+            content, getattr(file, "name", "releve.pdf")
+        )
+        if fallback_text:
+            df_text = _build_df_from_text_lines(
+                [ln.strip() for ln in fallback_text.splitlines() if ln.strip()]
+            )
+            if df_text is not None:
+                frames.append(df_text)
 
     if not frames:
         raise ValueError("Aucune transaction détectée dans le PDF du relevé.")
