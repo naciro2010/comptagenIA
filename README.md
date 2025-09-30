@@ -2,9 +2,9 @@
 
 Une application locale simple pour:
 
-- Lire des factures PDF et en extraire les champs clés
+- Lire des factures PDF **ou images** (PNG/JPG/TIFF) et en extraire les champs clés
 - Convertir en XML (si vous vouliez « xql », merci de confirmer; ici on exporte en XML)
-- Charger un relevé bancaire (PDF/CSV/XLSX)
+- Charger un relevé bancaire (PDF/CSV/XLSX ou image scannée)
 - Faire le matching facture ↔ opération bancaire
 - Exporter les résultats (CSV) et les factures extraites (XML)
 
@@ -77,8 +77,8 @@ Notes Cloud:
 
 ## Utilisation
 
-1. Chargez une ou plusieurs factures PDF.
-2. Chargez le relevé bancaire (PDF/CSV/XLSX). Le mapping de colonnes est détecté automatiquement (date, description, montant).
+1. Chargez une ou plusieurs factures (PDF ou images scannées).
+2. Chargez le relevé bancaire (PDF/CSV/XLSX ou photo). Le mapping de colonnes est détecté automatiquement (date, description, montant).
 3. Cliquez sur « Extraire factures » puis « Charger relevé ».
 4. Si souhaité, activez « Utiliser LLM local (Ollama) » dans la barre latérale (serveur Ollama nécessaire, modèle par défaut: `gpt-oss:20b`).
 5. Téléchargez l’export XML des factures et le CSV des résultats de matching.
@@ -92,8 +92,8 @@ Notes Cloud:
 ## Détails techniques
 
 - UI: `Streamlit` avec un style léger (voir `app/assets/styles.css`).
-- Extraction PDF: `pdfplumber` + heuristiques (numéro de facture, date, total, devise) puis enrichissement optionnel par LLM.
-- Relevé bancaire: PDF/CSV/XLSX. Pour PDF, extraction par tables puis fallback texte.
+- Extraction documents: `PyMuPDF` pour le texte natif + OCR hybride (`PaddleOCR` multi-langue puis `pytesseract` en secours) afin de lire les scans et photos. Les heuristiques (numéro de facture, date, total, devise) restent identiques avec enrichissement optionnel par LLM.
+- Relevé bancaire: PDF/CSV/XLSX/Images. Pour PDF, extraction par tables puis fallback texte/OCR partagé avec les factures.
 - Matching: tolérance de montant configurable (par défaut 0.02 EUR) et fenêtre de temps (90 jours). Vérifie aussi la présence du numéro de facture dans la description via fuzzy matching.
 - Export: XML des factures; CSV des correspondances.
 

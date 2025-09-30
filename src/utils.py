@@ -4,7 +4,7 @@ from typing import Optional
 
 from dateutil import parser as dateparser
 
-AMOUNT_RE = re.compile(r"([+-]?)\s*(\d{1,3}(?:[\.,]\d{3})*|\d+)([\.,](\d{2}))?")
+AMOUNT_RE = re.compile(r"([+-]?)\s*(\d{1,3}(?:[\.,]\d{3})+|\d+)([\.,](\d{2}))?")
 
 
 def parse_date(text: str) -> Optional[datetime]:

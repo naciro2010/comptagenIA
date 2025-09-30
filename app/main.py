@@ -73,16 +73,17 @@ def _display_sidebar() -> Dict[str, Any]:
 
 def _display_file_uploaders() -> Dict[str, Any]:
     """Displays file uploaders and returns a dictionary of uploaded files."""
-    st.subheader("1) Charger les factures PDF")
+    st.subheader("1) Charger les factures (PDF ou images)")
     pdf_files = st.file_uploader(
-        "Sélectionnez une ou plusieurs factures (PDF)",
-        type=["pdf"],
+        "Sélectionnez une ou plusieurs factures (PDF, PNG, JPG...)",
+        type=["pdf", "png", "jpg", "jpeg", "tiff", "tif", "bmp", "webp"],
         accept_multiple_files=True,
     )
 
-    st.subheader("2) Charger le relevé bancaire (PDF/CSV/XLSX)")
+    st.subheader("2) Charger le relevé bancaire (PDF/CSV/XLSX ou image)")
     bank_file = st.file_uploader(
-        "Sélectionnez le relevé bancaire", type=["pdf", "csv", "xlsx", "xls"]
+        "Sélectionnez le relevé bancaire",
+        type=["pdf", "csv", "xlsx", "xls", "png", "jpg", "jpeg", "tiff", "tif"],
     )
     return {"pdf_files": pdf_files, "bank_file": bank_file}
 
@@ -93,7 +94,7 @@ def _handle_extraction(
     """Handles the invoice extraction process."""
     if st.button("🚀 Extraire factures"):
         if not pdf_files:
-            st.warning("Veuillez charger au moins une facture PDF.")
+            st.warning("Veuillez charger au moins une facture (PDF ou image).")
             return None
         with st.spinner("Extraction en cours..."):
             extracted_invoices = extract_invoices_from_pdfs(
