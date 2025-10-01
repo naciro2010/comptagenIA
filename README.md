@@ -3,7 +3,10 @@
 Une application locale simple pour:
 
 - Lire des factures PDF **ou images** (PNG/JPG/TIFF) et en extraire les champs clés
-- Charger un relevé bancaire (PDF/CSV/XLSX ou image scannée) et reconstruire les transactions
+
+- Charger un relevé bancaire (PDF/CSV/XLSX ou image scannée) et reconstruire les - Convertir en XML (si vous vouliez « xql », merci de confirmer; ici on exporte en XML)
+- Charger un relevé bancaire (PDF/CSV/XLSX ou image scannée)
+
 - Faire le matching facture ↔ opération bancaire
 - Exporter les résultats (CSV) et les factures extraites (XML)
 
