@@ -3,12 +3,19 @@
 Une application locale simple pour:
 
 - Lire des factures PDF **ou images** (PNG/JPG/TIFF) et en extraire les champs clés
-- Convertir en XML (si vous vouliez « xql », merci de confirmer; ici on exporte en XML)
+
+- Charger un relevé bancaire (PDF/CSV/XLSX ou image scannée) et reconstruire les - Convertir en XML (si vous vouliez « xql », merci de confirmer; ici on exporte en XML)
 - Charger un relevé bancaire (PDF/CSV/XLSX ou image scannée)
+
 - Faire le matching facture ↔ opération bancaire
 - Exporter les résultats (CSV) et les factures extraites (XML)
 
-Tech choisi: Python + Streamlit (simple, local, facile à déployer et à faire évoluer). Option d'extraction via LLM local (Ollama) si disponible.
+Deux implémentations cohabitent :
+
+1. **Service Spring Boot Kotlin (`spring-app/`)** – pipeline OCR hybride (PDFBox + Tesseract) exposé via une API REST et une page web statique.
+2. **Prototype Streamlit Python (`app/`)** – conservé pour référence historique.
+
+Le reste de ce document détaille les deux options. Si vous partez de zéro, privilégiez la version Kotlin.
 
 ## Prérequis
 
@@ -111,7 +118,7 @@ Vous avez mentionné « xql ». J’ai implémenté un export **XML** (standard)
 
 ## Module Spring Boot Kotlin
 
-Un service REST Kotlin/Spring Boot (`spring-app/`) reprend les briques principales (extraction factures, lecture relevés, matching et export XML).
+Un service REST Kotlin/Spring Boot (`spring-app/`) reprend les briques principales : OCR hybride, parsing heuristique et exposition d'une API simple pour les factures et relevés bancaires.
 
 ### Lancer le service
 - Prérequis: JDK 21+
@@ -119,31 +126,20 @@ Un service REST Kotlin/Spring Boot (`spring-app/`) reprend les briques principal
 - `JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew bootRun`
 
 ### API principale
-`POST /api/matching/run` (`multipart/form-data`)
-- `invoices`: un ou plusieurs PDF de factures
-- `bankStatement`: relevé bancaire (PDF/CSV/XLS/XLSX)
-- `amountTolerance` (optionnel, défaut `0.02`)
-- `dateToleranceDays` (optionnel, défaut `90`)
-- `useLlm` (optionnel, défaut `false`). Lorsqu'il est activé, Ollama est utilisé à la fois pour enrichir les factures **et** pour détecter automatiquement les colonnes du relevé / reconstruire les transactions si le format est atypique.
-- `llmModel` (optionnel, défaut `gpt-oss:20b`)
-
-Réponse JSON: factures extraites, résultats de matching, export XML inline.
+- `POST /api/documents/invoices/extract` (`multipart/form-data`)
+  - Champ `files`: un ou plusieurs fichiers facture (PDF natif ou image scannée)
+  - Réponse: tableau JSON avec `invoiceNumber`, `invoiceDate`, `totalAmount`, `currency`, `rawText`
+- `POST /api/documents/bank-statements/extract` (`multipart/form-data`)
+  - Champ `file`: relevé bancaire (PDF/CSV/XLS/XLSX ou image)
+  - Réponse: objet JSON contenant `transactions` (date/description/montant normalisés) et `rawText` (texte OCR brut si pertinent)
 
 ### Front de test rapide
-Une page statique est disponible sur `http://localhost:8080/` (servie depuis `spring-app/src/main/resources/static/index.html`). Elle permet d'uploader les fichiers, ajuster les paramètres et inspecter les résultats sans outil externe.
+Une page statique est disponible sur `http://localhost:8080/` (servie depuis `spring-app/src/main/resources/static/index.html`). Elle appelle directement les deux endpoints ci-dessus et affiche:
 
-La section résultats affiche désormais les transactions du relevé (issues des heuristiques ou de l'IA). Les lignes surlignées en vert correspondent aux opérations appariées à une facture.
+- Les métadonnées extraites des factures (numéro, date, total, devise)
+- Les transactions reconstituées du relevé bancaire, avec accès au texte OCR complet
 
-- Les factures multiples dans un même PDF sont détectées automatiquement (`fichier.pdf#1`, `fichier.pdf#2`, ...). Chaque fiche affiche les métadonnées principales (fournisseur, client, en-tête) et l'état du matching (vert = trouvé, rouge = manquant).
-
-**Note upload**: la limite côté serveur est fixée à ~120 Mo par fichier (130 Mo par requête). Au‑delà, l'API renvoie un message d'erreur lisible dans l'interface.
-
-En cas de fichier mal reconnu (par ex. colonnes manquantes), l'API renvoie un 400 avec le détail (`Impossible de détecter la colonne ...`, `Aucune transaction détectée ...`) et la page web reflète ce message.
-
-### Configuration Ollama
-- Variables dans `application.properties` (`ollama.base-url`, `ollama.model`, `ollama.enabled`).
-- Par défaut, le service tente d'appeler Ollama en local mais ignore les erreurs de connexion pour rester fonctionnel.
-- Si vous saisissez un modèle non installé (ex. `mistral`), le service retombe automatiquement sur le modèle par défaut (`gpt-oss:20b`) et loggue un avertissement. Pour utiliser un autre modèle, téléchargez-le au préalable (`ollama pull <modele>`).
+**Note upload**: la limite côté serveur est fixée à ~120 Mo par fichier (130 Mo par requête). En cas d'échec (format exotique, colonnes introuvables), l'API répond avec un message explicite.
 
 ### Tests
 `JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew test`
